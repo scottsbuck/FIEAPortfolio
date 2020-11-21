@@ -2,13 +2,12 @@
 and may not be redistributed without written permission.*/
 
 //Using SDL, SDL_image, standard IO, and strings
-//WHADDUP
 #include <SDL.h>
 #include <SDL_image.h>
 #include <iostream>
 #include <string>
-
-using namespace std;
+#include <time.h>
+#include <stdlib.h>
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1024;
@@ -17,16 +16,14 @@ const int SCREEN_HEIGHT = 800;
 //Starts up SDL and creates window
 bool init();
 
-SDL_Texture* loadTexture(string path);
+SDL_Texture* loadTexture(std::string path);
 
 //Loads media
-bool loadMedia(string path);
+bool loadMedia(std::string path);
 
 bool isCollision(SDL_Rect renderArea1, SDL_Rect renderArea2);
 
 bool compare(int number1, int number2);
-
-int search(int** turns, int posX, int posY, int turnCount);
 
 //Frees media and shuts down SDL
 void close();
@@ -46,7 +43,7 @@ SDL_Renderer* gRenderer = NULL;
 //SDL_Surface* gPNGSurface = NULL;
 SDL_Texture* gTexture = NULL;
 
-SDL_Texture* lTexture = NULL;
+SDL_Texture* snakeSegImage = NULL;
 
 SDL_Texture* blackSquare = NULL;
 
@@ -99,7 +96,7 @@ bool init()
 	return success;
 }
 
-SDL_Texture* loadTexture(string path)
+SDL_Texture* loadTexture(std::string path)
 {
 	//final texture
 	SDL_Texture* newTexture = NULL;
@@ -126,7 +123,7 @@ SDL_Texture* loadTexture(string path)
 
 }
 
-bool loadMedia(string path)
+bool loadMedia(std::string path)
 {
 	//Loading success flag
 	bool success = true;
@@ -159,53 +156,46 @@ void close()
 	SDL_Quit();
 }
 
+//the init(), loadtexture, loadmedia, and close functions are provided from a SDL tutorial mentioned at the top of the file
+//98% of the rest of the code is mine.  Only code that isnt is the event handle and initialization loop at the start of main
+
+
+//This is the SnakeSegment class, it holds the values for each segment spawned.
 class SnakeSegment
 {
 public:
 
-	//getters and setters
-
+	//default constructor, initializes all of the members of the class to base values
 	SnakeSegment()
 	{
 		segmentPosX = 0;
 		segmentPosY = 0;
 		setIsX(true);
 		setVelocity(0);
-
 	}
 
-	void initialize()
-	{
-		segmentPosX = 0;
-		segmentPosY = 0;
-		setIsX(true);
-		setVelocity(0);
-	}
-
+	//getters and setters
 	int getVelocity()
 	{
 		return segmentVelocity;
 	}
 
+	//sets the velocity according to the defined min and max velocities.
+	//the min and max velocities are related to the size of the segment for movement purposes explained later
 	void setVelocity(int vel)
 	{
-		int maxVel = 50;
-		int minVel = -50;
-
 		if (vel > maxVel)
 		{
-			cout << "Velocity is too large";
+			std::cout << "Velocity is too large";
 		}
 		else if (vel < minVel)
 		{
-			cout << "Velocity is too small";
+			std::cout << "Velocity is too small";
 		}
 		else
 		{
 			segmentVelocity = vel;
 		}
-
-
 	}
 
 	bool getIsX()
@@ -213,9 +203,10 @@ public:
 		return isX;
 	}
 
-	void setIsX(bool maybe)
+	//changes the isX boolean which is responsible for telling if the segment is moving in the x or y direction. true = x false = y
+	void setIsX(bool currentDir)
 	{
-		isX = maybe;
+		isX = currentDir;
 	}
 
 	int getPosX()
@@ -223,10 +214,12 @@ public:
 		return segmentPosX;
 	}
 
+	//the setPosX function changes the x position of the segment based on the velocity passed through.
+	//the if statements are to bound check so the objects cannout go off the screen.
 	void setPosX(int velocity)
 	{
 		int minPos = 0;
-		int maxPos = 1024;
+		int maxPos = screenSizeX;
 		int newPos = segmentPosX += velocity;
 
 		if (newPos > maxPos || newPos < minPos)
@@ -245,10 +238,12 @@ public:
 		return segmentPosY;
 	}
 
+	//the setPosY function changes the y position of the segment based on the velocity passed through.
+	//the if statements are to bound check so the objects cannout go off the screen.
 	void setPosY(int velocity)
 	{
 		int minPos = 0;
-		int maxPos = 800;
+		int maxPos = screenSizeY;
 		int newPos = segmentPosY += velocity;
 
 		if (newPos > maxPos || newPos < minPos)
@@ -262,6 +257,8 @@ public:
 
 	}
 
+	//these two functions are used to set the position unrelated to the velocity, generally used to initialize a segment when it is spawning in
+	//also used to set the segment position to the segment in front of its position for the snake segmenet follow logic
 	void setSegmentSpotX(int newSpot)
 	{
 		segmentPosX = newSpot;
@@ -283,14 +280,19 @@ public:
 		return segmentWidth;
 	}
 
-	void handleButton(SDL_Event e)
-	{
-		 
-	}
-
-	string getImage()
+	std::string getImage()
 	{
 		return image;
+	}
+
+	int getMinVel()
+	{
+		return minVel;
+	}
+
+	int getMaxVel()
+	{
+		return maxVel;
 	}
 
 private:
@@ -298,96 +300,80 @@ private:
 	//depending on key clicked, velocity will change
 	int segmentVelocity = 0;
 	bool isX = true;
-
+	int maxVel = 50;
+	int minVel = -50;
 	int segmentPosX, segmentPosY;
-	const string image = "dotTest3.png";
+	int screenSizeY = 800;
+	int screenSizeX = 1024;
+	const std::string image = "dotTest3.png";
 	//segment length
 	static const int segmentLength = 50;
 	static const int segmentWidth = 50;
 };
 
+//collision detection logic
 bool isCollision(SDL_Rect renderArea1, SDL_Rect renderArea2)
 {
 	bool x = false;
 	bool y = false;
 
-	int xRadius1 = renderArea1.w / 2;
-	int xRadius2 = renderArea2.w / 2;
-	int yRadius1 = renderArea1.h / 2;
-	int yRadius2 = renderArea2.h / 2;
-
-	int boundx[4] = {renderArea1.x - xRadius1, renderArea1.x + xRadius1, renderArea2.x - xRadius2, renderArea2.x + xRadius2};
-	int boundy[4] = {renderArea1.y - yRadius1, renderArea1.y + yRadius1, renderArea2.y - yRadius2, renderArea2.y + yRadius2};
+	//bounding box coordinates related to the render area.  renderarea.x and renderarea.y are the top left x and y coordinates of the
+	//SDL_Rect.  Adding the width to the x gives us the right side of the rectangle, and adding the heigh to the y
+	//gives us the bottom of the rectangle.
+	int bound1[4] = {renderArea1.x, renderArea1.x + renderArea1.w, renderArea1.y, renderArea1.y + renderArea1.h};
+	int bound2[4] = {renderArea2.x, renderArea2.x + renderArea2.w, renderArea2.y, renderArea2.y + renderArea2.h};
 	
-	int top1 = boundy[0];
-	int bot1 = boundy[1];
-	int left1 = boundx[0];
-	int right1 = boundx[1];
+	int left1 = bound1[0];
+	int right1 = bound1[1];
+	int top1 = bound1[2];
+	int bot1 = bound1[3];
 
-	int top2 = boundy[2];
-	int bot2 = boundy[3];
-	int left2 = boundx[2];
-	int right2 = boundx[3];
+	int left2 = bound2[0];
+	int right2 = bound2[1];
+	int top2 = bound2[2];
+	int bot2 = bound2[3];
 
+	//we compare the y coordinates of the rectangles
 	if ((top1 <= bot2 && top1 >= top2) || (bot1 >= top2 && bot1 <= bot2))
 	{
 		y = true;
 	}
+	//then we compare the x coordinates of the rectangles
 	if ((left1 <= right2 && left1 >= left2) || (right1 >= left2 && right1 <= right2))
 	{
 		x = true;
 		
 	}
 
+	//if and only if the x coordinates are crossing and the y coordinates are crossing, are the objects colliding
 	return (y && x);
-}
-
-bool compare(int number1, int number2)
-{
-	if (number1 == number2)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-int search(int ** turns, int posX, int posY, int turnCount)
-{
-	int count = 0;
-	while (turns[2][count] == -1)
-	{
-		count++;
-	}
-	for (int i = count; count < turnCount; count++)
-	{
-		if (compare(turns[0][count], posX) && compare(turns[1][count], posY))
-		{
-			return turns[2][count];
-		}
-	}
-	return -1;
 }
 
 int main(int argc, char* args[])
 {
 
+	//array that holds all of our snake segments
+	//because of how c++ works, creating that array actually initializes all of the segments for us.
+	//used to have an initialize functions because i hadn't realized that fact.  In C# for example i believe you would have to initialize
+	//each element in the area
 	SnakeSegment segment [100];
+	//lose state boolean, we check it at the end of the main function
 	bool lose = false;
-	segment[0].initialize();
 	int velocity = 0;
 	bool isX = true;
 	int x = 0, y = 0;
-	bool button = false;
-	SDL_Rect renderArea = { segment[0].getPosX(), segment[0].getPosY() , segment[0].getSegLength(), segment[0].getSegWidth()};
-	SDL_Rect renderSpot = { 400, 400, segment[0].getSegLength(), segment[0].getSegLength() };
+	//the SDL rectangle used for the render size for specifically the first segment
+	SDL_Rect headArea = { segment[0].getPosX(), segment[0].getPosY() , segment[0].getSegLength(), segment[0].getSegWidth()};
+	//rectangle used to render the subsequent snake segments, also used for lose state as to make an additional rectangle
+	SDL_Rect tailArea = { 400, 400, segment[0].getSegLength(), segment[0].getSegLength()};
+	//rectangle used for the square that the snake is trying to eat
 	SDL_Rect squareRenderArea = {200, 200, 100, 100};
 	int w = 0;
-	int rendered = 0;
+	bool rendered = false;
 	int count = 0;
 	int timer = 0;
+
+	srand(time(NULL));
 	
 	//Start up SDL and create window
 	if (!init())
@@ -421,85 +407,66 @@ int main(int argc, char* args[])
 						quit = true;
 					}
 
+					//checking if a key has been pressed
 					if (e.type = SDL_KEYDOWN && e.key.repeat == 0)
 					{
+						//checking which key has been pressed and then adjusting the isX variable and velocity variable.
+						//it first checks if the segment is going in the opposite direction of the button click
+						//if it is then the values dont change, this is to prevent the snake from doing a 180 in direction
 						switch (e.key.keysym.sym)
 						{
 						case SDLK_UP:
-							if (segment[0].getIsX() == false && segment[0].getVelocity() == 50)
+							if (segment[0].getIsX() == false && segment[0].getVelocity() == segment[0].getMaxVel())
 							{
 								break;
 							}
 							segment[0].setIsX(false);
-							segment[0].setVelocity(-50);
-							//button = true;
+							segment[0].setVelocity(segment[0].getMinVel());
 							break;
 						case SDLK_DOWN:
-							if (segment[0].getIsX() == false && segment[0].getVelocity() == -50)
+							if (segment[0].getIsX() == false && segment[0].getVelocity() == segment[0].getMinVel())
 							{
 								break;
 							}
 							segment[0].setIsX(false);
-							segment[0].setVelocity(50);
-							//button = true;
+							segment[0].setVelocity(segment[0].getMaxVel());
 							break;
 						case SDLK_LEFT:
-							if (segment[0].getIsX() == true && segment[0].getVelocity() == 50)
+							if (segment[0].getIsX() == true && segment[0].getVelocity() == segment[0].getMaxVel())
 							{
 								break;
 							}
 							segment[0].setIsX(true);
-							segment[0].setVelocity(-50);
-							//button = true;
+							segment[0].setVelocity(segment[0].getMinVel());
 							break;
 						case SDLK_RIGHT:
-							if (segment[0].getIsX() == true && segment[0].getVelocity() == -50)
+							if (segment[0].getIsX() == true && segment[0].getVelocity() == segment[0].getMinVel())
 							{
 								break;
 							}
 							segment[0].setIsX(true);
-							segment[0].setVelocity(50);
-							//button = true;
+							segment[0].setVelocity(segment[0].getMaxVel());
 							break;
 						}
 					}
 				}
 				
-				if (rendered == 0)
+				// since this is in a while loop we dont want to render this a bunch of times so they have a switch
+				if (!rendered)
 				{
-					lTexture = loadTexture(segment[0].getImage());
+					snakeSegImage = loadTexture(segment[0].getImage());
 				}
-				if (rendered == 0)
+				if (!rendered)
 				{
 					blackSquare = loadTexture("blackSquare.png");
 				}
-				if (rendered == 0)
+				if (!rendered)
 				{
 					endScreen = loadTexture("endScreen.png");
 				}
-				rendered = 1;
+				rendered = true;
 
-				if (timer % segment[0].getSegLength() == 0)
-				{
-					if (segment[0].getIsX())
-					{
-						segment[0].setPosX(segment[0].getVelocity());
-						if (segment[0].getPosX() > 1024 || segment[0].getPosX() < 0)
-						{
-							lose = true;
-						}
-						renderArea = { segment[0].getPosX(), segment[0].getPosY(), segment[0].getSegLength(), segment[0].getSegWidth() };
-					}
-					else if (!segment[0].getIsX())
-					{
-						segment[0].setPosY(segment[0].getVelocity());
-						if (segment[0].getPosY() > 800 || segment[0].getPosY() < 0)
-						{
-							lose = true;
-						}
-						renderArea = { segment[0].getPosX(), segment[0].getPosY(), segment[0].getSegLength(), segment[0].getSegWidth() };
-					}
-				}
+				
 				
 				
 
@@ -507,40 +474,44 @@ int main(int argc, char* args[])
 				SDL_RenderClear(gRenderer);
 
 				//Render Texture to screen
+				//render snake segment at the headarea
+				SDL_RenderCopy(gRenderer, snakeSegImage, NULL, &headArea);
 				
-				SDL_RenderCopy(gRenderer, gTexture, NULL, NULL);
-				
-				SDL_RenderCopy(gRenderer, lTexture, NULL, &renderArea);
-				
+				//render black square(object to be eaten) at square render area
 				SDL_RenderCopy(gRenderer, blackSquare, NULL, &squareRenderArea);
 
-				if (isCollision(renderArea, squareRenderArea))
+				//check collision between head and the square
+				if (isCollision(headArea, squareRenderArea))
 				{
+					//randomize the render area of the next square
 					count++;
 					int c1 = rand() % (1024 - 100) + 1;
 					int c2 = rand() % (800 - 100) + 1;
 					squareRenderArea = { c1, c2, 100, 100 };
 
-					segment[count].initialize();
+					//count is how many segments there are.
+					//this code sets the new segment equal to the direction and velocity of the one in front of it
 					segment[count].setIsX(segment[count - 1].getIsX());
 					segment[count].setVelocity(segment[count - 1].getVelocity());
 
-					if (segment[count - 1].getIsX() && segment[count - 1].getVelocity() == 50)
+					//sets the x and y positions of the new segment based on the direction and velocity of the segment in
+					//front of it so that the new segment is directly behind the segment in front of it
+					if (segment[count - 1].getIsX() && segment[count - 1].getVelocity() == segment[0].getMaxVel())
 					{
 						segment[count].setSegmentSpotX(segment[count - 1].getPosX() - segment[count].getSegWidth());
 						segment[count].setSegmentSpotY(segment[count - 1].getPosY());
 					}
-					else if (segment[count - 1].getIsX() && segment[count - 1].getVelocity() == -50)
+					else if (segment[count - 1].getIsX() && segment[count - 1].getVelocity() == segment[0].getMinVel())
 					{
 						segment[count].setSegmentSpotX(segment[count - 1].getPosX() + segment[count].getSegWidth());
 						segment[count].setSegmentSpotY(segment[count - 1].getPosY());
 					}
-					else if (!segment[count - 1].getIsX() && segment[count - 1].getVelocity() == 50)
+					else if (!segment[count - 1].getIsX() && segment[count - 1].getVelocity() == segment[0].getMaxVel())
 					{
 						segment[count].setSegmentSpotY(segment[count - 1].getPosY() - segment[count].getSegLength());
 						segment[count].setSegmentSpotX(segment[count - 1].getPosX());
 					}
-					else if (!segment[count - 1].getIsX() && segment[count - 1].getVelocity() == -50)
+					else if (!segment[count - 1].getIsX() && segment[count - 1].getVelocity() == segment[0].getMinVel())
 					{
 						segment[count].setSegmentSpotY(segment[count - 1].getPosY() + segment[count].getSegLength());
 						segment[count].setSegmentSpotX(segment[count - 1].getPosX());
@@ -550,101 +521,72 @@ int main(int argc, char* args[])
 				}
 
 				//tails follow head
+				//for each tail(count) set the tail area to its position and render it
 				for (int i = count; i > 0; i--)
 				{
 
-					renderSpot.x = segment[i].getPosX();
-					renderSpot.y = segment[i].getPosY();
-					SDL_RenderCopy(gRenderer, lTexture, NULL, &renderSpot);
-
+					tailArea.x = segment[i].getPosX();
+					tailArea.y = segment[i].getPosY();
+					SDL_RenderCopy(gRenderer, snakeSegImage, NULL, &tailArea);
+					
+					//this is the same incrememnt for when the head moves, so everything moves at the same time
+					//move each tail x and y position to the position in front of it as well its velocity and isX values
+					//updating the velocity and isX values are important for the spawning of tail segments in the collision check
 					if (timer % segment[0].getSegLength() == 0)
 					{
-						segment[i].setSegmentSpotX(segment[i - 1].getPosX());
-						segment[i].setSegmentSpotY(segment[i - 1].getPosY());
-					}
-					
-
-					/*if (segment[i -1].getVelocity() == 10 && segment[i -1].getIsX())
-					{
-						segment[i].setVelocity(10);
-						segment[i].setIsX(true);
-						segment[i].setSegmentSpotX(segment[i - 1].getPosX() - segment[i].getSegLength());
-						segment[i].setSegmentSpotY(segment[i - 1].getPosY());
-					}
-					else if (segment[i - 1].getVelocity() == -10 && segment[i - 1].getIsX())
-					{
-						segment[i].setVelocity(-10);
-						segment[i].setIsX(true);
-						segment[i].setSegmentSpotX(segment[i - 1].getPosX() + segment[i].getSegLength());
-						segment[i].setSegmentSpotY(segment[i - 1].getPosY());
-					}
-					else if (segment[i - 1].getVelocity() == 10 && !segment[i - 1].getIsX())
-					{
-						segment[i].setVelocity(10);
-						segment[i].setIsX(false);
-						segment[i].setSegmentSpotX(segment[i - 1].getPosX());
-						segment[i].setSegmentSpotY(segment[i - 1].getPosY() - segment[i].getSegLength());
-					}
-					else if (segment[i - 1].getVelocity() == -10 && !segment[i - 1].getIsX())
-					{
-						segment[i].setVelocity(-10);
-						segment[i].setIsX(false);
-						segment[i].setSegmentSpotX(segment[i - 1].getPosX());
-						segment[i].setSegmentSpotY(segment[i - 1].getPosY() + segment[i].getSegLength());
-					}*/
-					
-					
-				}
-				timer++;
-					/*if (button == true)
-					{
+						//update tail segment to one in front it position wise.
 						segment[i].setVelocity(segment[i - 1].getVelocity());
 						segment[i].setIsX(segment[i - 1].getIsX());
-					}
-					if (segment[i].getIsX())
-					{
-						segment[i].setPosX(segment[i].getVelocity());
-					}
-					else if (!segment[i].getIsX())
-					{
-						segment[i].setPosY(segment[i].getVelocity());
+						segment[i].setSegmentSpotX(segment[i - 1].getPosX());
+						segment[i].setSegmentSpotY(segment[i - 1].getPosY());
 					}
 				}
-				button = false;*/
 
-				/*for (int i = 0; i < count; i++)
+				//this is the if statement that governs how often the head segment updates
+				//once the timer has increased an amount equal to the same number as the size of the segment the update can happen
+				//the way this works in reality is it simulates a velocity of 1. Every 50 updates the head will move 50 pixels
+				//so it "moves" 1 pixel per update.  This does make the game look a bit jittery and choppy, but this was implemented to
+				//solve an issue where when you would set the snake segment to the one in front of its position, they would just start
+				//stacking with a difference of 1 pixel (because that was the velocity)
+				//with the 50 pixel jumps, they are separated by just as many pixels
+				//also because of how timer is updated this is frame based, so the faster your computer, the faster the snake will move
+				//also had head movement above tail update but that would make it so that on the first square you ate
+				//a new tail segment would spawn but on top of the head, putting it after the tail update fixes that issue.
+				if (timer % segment[0].getSegLength() == 0)
 				{
-					SnakeSegment* temp = new SnakeSegment();
-					body->next = temp;
+					//check which direction the segment is going
+					if (segment[0].getIsX())
+					{
+						//update its position based on its velocity
+						segment[0].setPosX(segment[0].getVelocity());
+						//if the segment is about to go out of bounds with this update set the lose state to true
+						if (segment[0].getPosX() > 1024 || segment[0].getPosX() < 0)
+						{
+							lose = true;
+						}
+						//update the headarea (the render position for the head) to the new x and y values 
+						headArea = { segment[0].getPosX(), segment[0].getPosY(), segment[0].getSegLength(), segment[0].getSegWidth() };
+					}
+					//same as above just in different direction
+					else if (!segment[0].getIsX())
+					{
+						segment[0].setPosY(segment[0].getVelocity());
+						if (segment[0].getPosY() > 800 || segment[0].getPosY() < 0)
+						{
+							lose = true;
+						}
+						headArea = { segment[0].getPosX(), segment[0].getPosY(), segment[0].getSegLength(), segment[0].getSegWidth() };
+					}
+				}
 
-					temp->setSegmentSpotX(body->getPosX());
-					temp->setSegmentSpotY(body->getPosY());
-					if (body->getIsX() && body->getVelocity() == 1)
-					{
-						temp->setSegmentSpotX(body->getPosX() - temp->getSegWidth());
-					}
-					else if (body->getIsX() && body->getVelocity() == -1)
-					{
-						temp->setSegmentSpotX(body->getPosX() + temp->getSegWidth());
-					}
-					else if (!body->getIsX() && body->getVelocity() == 1)
-					{
-						temp->setSegmentSpotY(body->getPosY() - temp->getSegLength());
-					}
-					else if (!body->getIsX() && body->getVelocity() == -1)
-					{
-						temp->setSegmentSpotY(body->getPosY() + temp->getSegLength());
-					}
-					renderSpot = { temp->getPosX(), temp->getPosY(), temp->getSegLength(), temp->getSegWidth() };
-					SDL_RenderCopy(gRenderer, lTexture, NULL, &renderSpot);
-					body = body->next;
-				}*/
+				timer++;
 
+				//lose state check
 				if (lose)
 				{
 					SDL_RenderClear(gRenderer);
-					renderSpot = { 0,0, 1024, 800 };
-					SDL_RenderCopy(gRenderer, endScreen, NULL, &renderSpot);
+					tailArea = { 0,0, 1024, 800 };
+					SDL_RenderCopy(gRenderer, endScreen, NULL, &tailArea);
 				}
 
 				//update screen
