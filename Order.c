@@ -1,6 +1,4 @@
 //Scott Buck
-//COP3502 Sec 0002
-//October 31 2019
 
 #include <stdio.h>
 #include <string.h>
@@ -13,7 +11,8 @@
 //function has access to it without it being an input
 char newAlphOrder [ALPHABETLENGTH];
 
-// way to add one array to another
+//way to add one array to another
+//used to copy strings
 void addToArray (char ** names, char * tempNameAddress, int index, int strLength)
 {
   for (int i = 0; i < strLength; i++)
@@ -21,7 +20,7 @@ void addToArray (char ** names, char * tempNameAddress, int index, int strLength
     names[index][i] = tempNameAddress[i];
   }
 }
-// custom function to compare strings with any given alphabet order
+//custom function to compare strings with any given alphabet order
 int customStringCompare (char * string1, char * string2)
 {
   int length1 = strlen(string1);
@@ -36,20 +35,25 @@ int customStringCompare (char * string1, char * string2)
   {
     smallestLength = length2;
   }
+  //go through each letter in the words
   for (int j = 0; j < smallestLength; j++)
   {
+    //go through the whole alphabet
     for (int i = 0; i < ALPHABETLENGTH; i++)
     {
+      //if letter of first word occurs in alphabet before letter of second word
       if (string1[j] == newAlphOrder[i] && string2[j] != newAlphOrder[i])
       {
         counter = 1;
         break;
       }
+      //if letter of first word occurs in alphabet after letter of second word
       else if (string2[j] == newAlphOrder[i] && string1 [j] != newAlphOrder[i])
       {
         counter = 2;
         break;
       }
+      //if the letters are the same
       else if(string2[j] == newAlphOrder[i] && string1[j] == newAlphOrder[i])
       {
         counter = 0;
@@ -80,14 +84,17 @@ void merge (char ** names, int l, int m, int r)
   int i, j, k;
   int n1 = m - l + 1;
   int n2 = r - m;
+  //left and right string arrays for splitting for merge sort
   char ** leftName = calloc (n1+1, sizeof(char*));
   char ** rightName = calloc (n2+1, sizeof(char*));
+  //allocating memory
   for (i = 0; i < n1; i++)
   {
     int length = strlen(names[l+i]);
     leftName[i] = calloc (length+1, sizeof(char));
     addToArray(leftName, names[l+i], i, length);
   }
+  //allocating memeory
   for (j = 0; j < n2; j++)
   {
     int length = strlen(names[m+1+j]);
@@ -97,6 +104,8 @@ void merge (char ** names, int l, int m, int r)
   i = 0;
   j = 0;
   k = l;
+  //compare strings using the custom string compare and go through merge sort steps, comparing strings
+  //and placing them into the proper place
   while(i < n1 && j < n2)
   {
     if(customStringCompare(leftName[i],rightName[j]) == 1 || customStringCompare(leftName[i],rightName[j]) == 0)
